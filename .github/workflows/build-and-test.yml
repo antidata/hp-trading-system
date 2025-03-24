@@ -16,15 +16,9 @@ jobs:
         config:
           - {
             name: "Ubuntu GCC",
-            os: ubuntu-latest,
+            os: ubuntu-20.04,
             compiler: gcc,
             version: "10"
-          }
-          - {
-            name: "Ubuntu Clang",
-            os: ubuntu-latest,
-            compiler: clang,
-            version: "15"
           }
 
     steps:
@@ -36,19 +30,9 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cmake build-essential
         sudo apt-get install -y libgtest-dev libbenchmark-dev
-        if [ "${{ matrix.config.compiler }}" = "gcc" ]; then
-          sudo apt-get install -y g++-${{ matrix.config.version }}
-          echo "CC=gcc-${{ matrix.config.version }}" >> $GITHUB_ENV
-          echo "CXX=g++-${{ matrix.config.version }}" >> $GITHUB_ENV
-        else
-          # Add LLVM repository for Clang
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
-          sudo apt-get update
-          sudo apt-get install -y clang-${{ matrix.config.version }}
-          echo "CC=clang-${{ matrix.config.version }}" >> $GITHUB_ENV
-          echo "CXX=clang++-${{ matrix.config.version }}" >> $GITHUB_ENV
-        fi
+        sudo apt-get install -y g++-${{ matrix.config.version }}
+        echo "CC=gcc-${{ matrix.config.version }}" >> $GITHUB_ENV
+        echo "CXX=g++-${{ matrix.config.version }}" >> $GITHUB_ENV
 
     - name: Configure CMake
       run: |
