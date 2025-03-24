@@ -1,5 +1,7 @@
 # High-Performance Trading System
 
+[![Build and Test](https://github.com/antidata/hp-trading-system/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/antidata/hp-trading-system/actions/workflows/build-and-test.yml)
+
 A modern C++ trading system designed for high-performance market data processing and order execution.
 
 ## Features

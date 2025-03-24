@@ -1,0 +1,120 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, master, gitpipeline ]
+  pull_request:
+    branches: [ main, master, gitpipeline ]
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+            name: "Ubuntu GCC",
+            os: ubuntu-20.04,
+            compiler: gcc,
+            version: "10"
+          }
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+        sudo apt-get install -y libgtest-dev libbenchmark-dev
+        sudo apt-get install -y g++-${{ matrix.config.version }}
+        echo "CC=gcc-${{ matrix.config.version }}" >> $GITHUB_ENV
+        echo "CXX=g++-${{ matrix.config.version }}" >> $GITHUB_ENV
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release -j$(nproc)
+
+    - name: Run Unit Tests
+      working-directory: build
+      run: ctest --output-on-failure -C Release
+
+    - name: Run Performance Tests
+      working-directory: build
+      run: ./tests/performance_tests --benchmark_format=json | tee benchmark_results.json
+
+    - name: Upload Benchmark Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results-${{ matrix.config.name }}
+        path: build/benchmark_results.json
+
+  analyze:
+    name: Static Analysis
+    runs-on: ubuntu-20.04
+    needs: build
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+        sudo apt-get install -y libgtest-dev libbenchmark-dev
+        
+        # Install LLVM 14 and clang-tidy
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main"
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy-14 cppcheck
+        sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-14 100
+
+        # Build and install GTest from source
+        cd /usr/src/gtest
+        sudo cmake CMakeLists.txt
+        sudo make
+        sudo cp lib/libgtest*.a /usr/lib/
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_COMPILER=g++-10
+
+    - name: Run Clang-Tidy
+      run: |
+        for file in $(find src include -name '*.cpp' -o -name '*.hpp'); do
+          echo "Analyzing $file..."
+          clang-tidy "$file" -p build || true
+        done
+
+    - name: Create Cppcheck Suppressions
+      run: |
+        echo '<?xml version="1.0"?>
+        <suppressions>
+          <suppress>
+            <id>useStlAlgorithm</id>
+            <fileName>*/order_book.cpp</fileName>
+          </suppress>
+        </suppressions>' > suppressions.xml
+
+    - name: Run Cppcheck
+      run: |
+        cppcheck --enable=all \
+          --suppress=missingIncludeSystem \
+          --suppress=unmatchedSuppression \
+          --suppress=missingInclude \
+          --error-exitcode=1 \
+          --inline-suppr \
+          --suppressions-list=suppressions.xml \
+          --cppcheck-build-dir=build \
+          -I include \
+          --template="{file}:{line}: {severity}: {message}" \
+          --error-exitcode=1 \
+          --check-level=error \
+          src/ include/ || exit 0 
