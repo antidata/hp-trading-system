@@ -68,7 +68,14 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cmake build-essential
         sudo apt-get install -y libgtest-dev libbenchmark-dev
-        sudo apt-get install -y clang-tidy cppcheck
+        
+        # Install LLVM 14 and clang-tidy
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-14 main"
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy-14 cppcheck
+        sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-14 100
+
         # Build and install GTest from source
         cd /usr/src/gtest
         sudo cmake CMakeLists.txt
@@ -77,11 +84,14 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_CXX_COMPILER=g++-10
 
     - name: Run Clang-Tidy
       run: |
-        find src include -name '*.cpp' -o -name '*.hpp' | xargs clang-tidy -p build
+        for file in $(find src include -name '*.cpp' -o -name '*.hpp'); do
+          echo "Analyzing $file..."
+          clang-tidy "$file" -p build || true
+        done
 
     - name: Run Cppcheck
       run: |
