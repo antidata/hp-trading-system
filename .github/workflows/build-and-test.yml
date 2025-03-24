@@ -57,7 +57,7 @@ jobs:
 
   analyze:
     name: Static Analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: build
 
     steps:
@@ -66,12 +66,22 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+        sudo apt-get install -y libgtest-dev libbenchmark-dev
         sudo apt-get install -y clang-tidy cppcheck
+        # Build and install GTest from source
+        cd /usr/src/gtest
+        sudo cmake CMakeLists.txt
+        sudo make
+        sudo cp lib/libgtest*.a /usr/lib/
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
     - name: Run Clang-Tidy
       run: |
-        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-        run-clang-tidy -p build
+        find src include -name '*.cpp' -o -name '*.hpp' | xargs clang-tidy -p build
 
     - name: Run Cppcheck
       run: |
