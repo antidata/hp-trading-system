@@ -35,7 +35,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake build-essential
-        sudo apt-get install -y libgtest-dev google-benchmark
+        sudo apt-get install -y libgtest-dev libbenchmark-dev
         if [ "${{ matrix.config.compiler }}" = "gcc" ]; then
           sudo apt-get install -y g++-${{ matrix.config.version }}
           echo "CC=gcc-${{ matrix.config.version }}" >> $GITHUB_ENV
