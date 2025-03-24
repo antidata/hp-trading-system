@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [ master, gitpipeline ]
+    branches: [ main, master, gitpipeline ]
   pull_request:
-    branches: [ master, gitpipeline ]
+    branches: [ main, master, gitpipeline ]
 
 jobs:
   build:
@@ -59,10 +59,10 @@ jobs:
 
     - name: Run Performance Tests
       working-directory: build
-      run: ./tests/performance/order_book_perf_test --benchmark_format=json | tee benchmark_results.json
+      run: ./tests/performance_tests --benchmark_format=json | tee benchmark_results.json
 
-    - name: Store Benchmark Results
-      uses: actions/upload-artifact@v3
+    - name: Upload Benchmark Results
+      uses: actions/upload-artifact@v4
       with:
         name: benchmark-results-${{ matrix.config.name }}
         path: build/benchmark_results.json
