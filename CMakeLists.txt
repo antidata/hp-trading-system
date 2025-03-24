@@ -27,5 +27,4 @@ find_package(benchmark REQUIRED)
 
 # Add subdirectories
 add_subdirectory(src)
-add_subdirectory(tests)
-add_subdirectory(tests/performance) 
+add_subdirectory(tests) 

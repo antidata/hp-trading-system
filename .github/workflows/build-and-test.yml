@@ -1,0 +1,92 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+            name: "Ubuntu GCC",
+            os: ubuntu-latest,
+            compiler: gcc,
+            version: "10"
+          }
+          - {
+            name: "Ubuntu Clang",
+            os: ubuntu-latest,
+            compiler: clang,
+            version: "12"
+          }
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+        sudo apt-get install -y libgtest-dev google-benchmark
+        if [ "${{ matrix.config.compiler }}" = "gcc" ]; then
+          sudo apt-get install -y g++-${{ matrix.config.version }}
+          echo "CC=gcc-${{ matrix.config.version }}" >> $GITHUB_ENV
+          echo "CXX=g++-${{ matrix.config.version }}" >> $GITHUB_ENV
+        else
+          sudo apt-get install -y clang-${{ matrix.config.version }}
+          echo "CC=clang-${{ matrix.config.version }}" >> $GITHUB_ENV
+          echo "CXX=clang++-${{ matrix.config.version }}" >> $GITHUB_ENV
+        fi
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release -j$(nproc)
+
+    - name: Run Unit Tests
+      working-directory: build
+      run: ctest --output-on-failure -C Release
+
+    - name: Run Performance Tests
+      working-directory: build
+      run: ./tests/performance/order_book_perf_test --benchmark_format=json | tee benchmark_results.json
+
+    - name: Store Benchmark Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results-${{ matrix.config.name }}
+        path: build/benchmark_results.json
+
+  analyze:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy cppcheck
+
+    - name: Run Clang-Tidy
+      run: |
+        cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        run-clang-tidy -p build
+
+    - name: Run Cppcheck
+      run: |
+        cppcheck --enable=all --suppress=missingIncludeSystem --error-exitcode=1 \
+          --inline-suppr --template="{file}:{line}: {severity}: {message}" \
+          src/ include/ 
