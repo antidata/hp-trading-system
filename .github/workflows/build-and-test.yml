@@ -24,7 +24,7 @@ jobs:
             name: "Ubuntu Clang",
             os: ubuntu-latest,
             compiler: clang,
-            version: "12"
+            version: "15"
           }
 
     steps:
@@ -41,6 +41,10 @@ jobs:
           echo "CC=gcc-${{ matrix.config.version }}" >> $GITHUB_ENV
           echo "CXX=g++-${{ matrix.config.version }}" >> $GITHUB_ENV
         else
+          # Add LLVM repository for Clang
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
+          sudo apt-get update
           sudo apt-get install -y clang-${{ matrix.config.version }}
           echo "CC=clang-${{ matrix.config.version }}" >> $GITHUB_ENV
           echo "CXX=clang++-${{ matrix.config.version }}" >> $GITHUB_ENV
